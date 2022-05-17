@@ -2,6 +2,10 @@
 
 This [motoko] library provides a module to help create an append-only logger actor.
 
+## Required runtime
+
+DFX 0.9.0
+
 ## Usage
 
 You can use this library with the [vessel] package manager.
