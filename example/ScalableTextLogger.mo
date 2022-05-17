@@ -8,7 +8,6 @@ import TextLogger "./TextLogger";
 
 actor class ScalableTextLogger() {
 
-  private var logger_index: Nat = 0;
   private var msg_count: Nat = 0;
   private var loggers = Buffer.Buffer<TextLogger.TextLogger>(10);
 
@@ -23,8 +22,9 @@ actor class ScalableTextLogger() {
       switch (List.get(msg_array_list, i)) {
         case (null) {};
         case (?msg_array) { 
-          let logger = await get_next_logger();
-          logger.append(msg_array); 
+          let logger = await get_logger(msg_count / MAX_MSGS_PER_LOGGER);
+          logger.append(msg_array);
+          msg_count := msg_count + msg_array.size(); 
         }
       };
       i := i + 1;
@@ -59,21 +59,19 @@ actor class ScalableTextLogger() {
 
   // make sure end is not out of bounds and there are max MAX_MSGS_PER_LOGGER messages between start and end inclusive   
   private func calc_end(start: Nat, to: Nat) : Nat {
-    let max_end = start + MAX_MSGS_PER_LOGGER - 1;  
+    let max_end = start + MAX_MSGS_PER_LOGGER - 1 - start % MAX_MSGS_PER_LOGGER;  
     if (max_end > to) { to } else { max_end }
   };
 
-  private func get_next_logger() : async TextLogger.TextLogger {
-    switch (loggers.getOpt(logger_index)) {
+  private func get_logger(index: Nat) : async TextLogger.TextLogger {
+    switch (loggers.getOpt(index)) {
       case (null) {
-        Cycles.add(CYCLE_LIMIT);
+        Cycles.add(CYCLE_LIMIT); // fund the new TextLogger canister
         let logger = await TextLogger.TextLogger();
         loggers.add(logger);
-        logger_index := logger_index + 1;
         logger
       };  
       case (?logger) { 
-        logger_index := logger_index + 1;
         logger 
       }
     }
@@ -102,7 +100,6 @@ actor class ScalableTextLogger() {
     if (buf.size() > 0) {
       split_msgs := List.push<[Text]>(buf.toArray(), split_msgs);
     };
-    msg_count := msg_count + msgs.size();
     // reverse it to maintain the order as the messages are pushed (pre-pended) one by one
     List.reverse(split_msgs)
   };
